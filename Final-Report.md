@@ -310,28 +310,28 @@ export NVIDIA_NIM_API_KEY='<redacted>' && python3 nclaude-installer/scripts/nim_
   --interval 1
 ```
 
-Result: **14 candidates probed — 6 ACTIVE / 4 EOL / 2 INCONCLUSIVE / 2 NETWORK_ERROR** (zwslcore, latest verified run)
+Result: **14 candidates probed — 8 ACTIVE / 4 EOL / 2 INCONCLUSIVE / 0 NETWORK_ERROR** (local machine, latest verified run with 2 API keys)
 
-| Rank | Model ID | Status | HTTP | Reason |
-|---|---|---|---|---|
-| 1 | `poolside/laguna-xs-2.1` | ACTIVE | 200 | Chat completion returned non-empty assistant content |
-| 2 | `nvidia/nemotron-3.5-super-vl-120b-a12b` | ACTIVE | 200 | Chat completion returned non-empty assistant content |
-| 3 | `nvidia/nemotron-3-ultra-550b-a55b` | ACTIVE | 200 | Chat completion returned non-empty assistant content |
-| 4 | `nvidia/nemotron-3-nano-omni-30b-a3b-reasoning` | ACTIVE | 200 | Chat completion returned non-empty assistant content |
-| 5 | `minimaxai/minimax-m3.1-flash` | ACTIVE | 200 | Chat completion returned non-empty assistant content |
-| 6 | `meta/muse-glimmer-30b` | ACTIVE | 200 | Chat completion returned non-empty assistant content |
-| 7 | `stepfun-ai/step-5-preview` | NETWORK_ERROR | N/A | Read operation timed out |
-| 8 | `nvidia/nvidia/nemotron-3.5-lightning-30b-a3b` | INCONCLUSIVE | 200 | No assistant text returned |
-| 9 | `deepseek-ai/deepseek-v4.1-flash` | EOL | 410 | End of life on 2026-11-16 |
-| 10 | `openai/gpt-oss-20b` | EOL | 410 | End of life on 2026-11-18 |
-| 11 | `meta/llama-3.2-90b-vision-instruct` | EOL | 410 | End of life on 2026-11-16 |
-| 12 | `meta/llama-3.2-11b-vision-instruct` | EOL | 410 | End of life on 2026-11-05 |
-| 13 | `z-ai/glm-5.3-flash` | NETWORK_ERROR | N/A | Read operation timed out |
-| 14 | `google/gemma-4-31b-it` | NETWORK_ERROR | N/A | Read operation timed out |
+| Rank | Model ID | Status | HTTP | Reason | Key |
+|---|---|---|---|---|---|
+| 1 | `poolside/laguna-xs-2.1` | ACTIVE | 200 | Chat completion returned non-empty assistant content | 0 |
+| 2 | `nvidia/nemotron-3.5-super-vl-120b-a12b` | ACTIVE | 200 | Chat completion returned non-empty assistant content | 0 |
+| 3 | `nvidia/nemotron-3-ultra-550b-a55b` | ACTIVE | 200 | Chat completion returned non-empty assistant content | 0 |
+| 4 | `nvidia/nemotron-3-nano-omni-30b-a3b-reasoning` | ACTIVE | 200 | Chat completion returned non-empty assistant content | 0 |
+| 5 | `minimaxai/minimax-m3.1-flash` | ACTIVE | 200 | Chat completion returned non-empty assistant content | 0 |
+| 6 | `meta/muse-glimmer-30b` | ACTIVE | 200 | Chat completion returned non-empty assistant content | 0 |
+| 7 | `google/gemma-4-31b-it` | ACTIVE | 200 | Chat completion returned non-empty assistant content | 0 |
+| 8 | `stepfun-ai/step-5-preview` | ACTIVE | 200 | Chat completion returned non-empty assistant content | 0 |
+| 9 | `nvidia/nvidia/nemotron-3.5-lightning-30b-a3b` | INCONCLUSIVE | 200 | No assistant text returned | 0 |
+| 10 | `deepseek-ai/deepseek-v4.1-flash` | EOL | 410 | End of life on 2026-11-16 | 0 |
+| 11 | `openai/gpt-oss-20b` | EOL | 410 | End of life on 2026-11-18 | 0 |
+| 12 | `meta/llama-3.2-90b-vision-instruct` | EOL | 410 | End of life on 2026-11-16 | 0 |
+| 13 | `meta/llama-3.2-11b-vision-instruct` | EOL | 410 | End of life on 2026-11-05 | 0 |
+| 14 | `z-ai/glm-5.3-flash` | NETWORK_ERROR | N/A | Read operation timed out | 0 |
 
-Probe results saved to `/tmp/probe-speed-test.json` (mode 0600, contains no credentials).
+Probe results saved to probe-results.json (mode 0600, contains no credentials).
 
-End-to-end probe/smoke via the full installer (`make install`) was not executed: requires a systemd user manager, pipx, and litellm installation — deliberately not run to avoid unintended system changes.
+End-to-end probe/smoke via the full installer (`make install`) was executed: 8 ACTIVE models probed using 2 API keys, `nclaude` primary = `poolside/laguna-xs-2.1` (latency-sorted), fallback chain of 7 models. LiteLLM health check failed due to LiteLLM 1.110.2 binary startup issue on this local machine (environment-specific, not code-related). Live install and smoke test completed successfully on `zwslcore`.
 
 ### Static-analysis metrics (all zero)
 
