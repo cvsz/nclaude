@@ -24,6 +24,33 @@ CLAUDE_ENV_KEYS = (
     "ANTHROPIC_DEFAULT_HAIKU_MODEL",
 )
 
+
+def load_api_keys() -> list[str]:
+    """Load all NVIDIA_NIM_API_KEY_N environment variables.
+
+    Returns a non-empty list of API keys. The first key is read from
+    NVIDIA_NIM_API_KEY; additional keys are read from
+    NVIDIA_NIM_API_KEY_02, NVIDIA_NIM_API_KEY_03, etc.
+    """
+    keys: list[str] = []
+    primary = os.environ.get("NVIDIA_NIM_API_KEY", "")
+    if primary:
+        keys.append(primary)
+    index = 2
+    while True:
+        key = os.environ.get(f"NVIDIA_NIM_API_KEY_{index:02d}", "")
+        if not key:
+            break
+        keys.append(key)
+        index += 1
+    if not keys:
+        raise SystemExit(
+            "NVIDIA_NIM_API_KEY is required in the environment. "
+            "Set NVIDIA_NIM_API_KEY (and optionally NVIDIA_NIM_API_KEY_02, "
+            "NVIDIA_NIM_API_KEY_03, ...) for multi-key rotation."
+        )
+    return keys
+
 def atomic_write(path: Path, content: str, mode: int = 0o600) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     fd, temp_name = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent)
@@ -104,19 +131,15 @@ def error_detail(body: dict[str, Any] | str) -> str:
         return str(detail).replace("\n", " ")[:300]
     return str(body).replace("\n", " ")[:300]
 
-def probe(args: argparse.Namespace) -> int:
-    api_key = os.environ.get("NVIDIA_NIM_API_KEY", "")
-    if not api_key:
-        raise SystemExit("NVIDIA_NIM_API_KEY is required in the environment.")
-    candidates = read_registry(Path(args.registry))
-    url = args.base_url.rstrip("/") + "/chat/completions"
-    headers = {
-        "Authorization": f"Bearer {api_key}",
-        "Content-Type": "application/json",
-        "Accept": "application/json",
-    }
+def probe_with_key(api_key: str, headers: dict[str, str],
+                   args: argparse.Namespace, candidates: list[dict[str, Any]],
+                   url: str) -> list[dict[str, Any]]:
+    """Probe all candidates with a single API key.
+
+    Returns a list of result dicts (one per candidate) with an added
+    ``key_index`` field identifying which key was used.
+    """
     results = []
-    print(f"Probing {len(candidates)} NVIDIA NIM candidates sequentially; max_tokens={args.max_tokens}.")
     for candidate in candidates:
         model_id = candidate["model_id"]
         payload = {
@@ -162,21 +185,67 @@ def probe(args: argparse.Namespace) -> int:
             "state": state,
             "reason": reason,
             "latency_seconds": round(elapsed, 4),
+            "key_index": headers.get("x-key-index", ""),
         }
         results.append(result)
-        print(f"[{state:13}] HTTP {status or 'N/A':>3}  {model_id}")
+        print(f"[{state:13}] HTTP {status or 'N/A':>3}  {model_id}  (key {headers.get('x-key-index', '?')})")
         if reason and state != "ACTIVE":
             print(f"               {reason}")
         # Avoid hammering the shared API catalog.
         time.sleep(args.interval)
-        if state in {"AUTH_ERROR", "FORBIDDEN"}:
-            print("Stopping probes because the API key/account is not authorized.")
+    return results
+
+
+def probe(args: argparse.Namespace) -> int:
+    keys = load_api_keys()
+    candidates = read_registry(Path(args.registry))
+    url = args.base_url.rstrip("/") + "/chat/completions"
+    results = []
+    print(f"Probing {len(candidates)} NVIDIA NIM candidates with {len(keys)} API key(s); max_tokens={args.max_tokens}.")
+    for key_index, api_key in enumerate(keys):
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+            "x-key-index": str(key_index),
+        }
+        key_results = probe_with_key(api_key, headers, args, candidates, url)
+        results.extend(key_results)
+        # Stop early if all candidates are already ACTIVE from earlier keys.
+        active_count = sum(1 for r in results if r.get("state") == "ACTIVE")
+        if active_count >= len(candidates):
             break
+        if key_index < len(keys) - 1:
+            print(f"--- Switching to API key index {key_index + 1} ---")
+    # Deduplicate: for each model_id, keep the first ACTIVE result, or the
+    # last non-ACTIVE result if none were ACTIVE.
+    best: dict[str, dict[str, Any]] = {}
+    for result in results:
+        mid = result["model_id"]
+        existing = best.get(mid)
+        if existing is None or (
+            result.get("state") == "ACTIVE" and existing.get("state") != "ACTIVE"
+        ):
+            best[mid] = result
+        elif result.get("state") != "ACTIVE" and existing.get("state") != "ACTIVE":
+            # Keep the later (more recent) non-active result.
+            best[mid] = result
+    results = list(best.values())
+    # Preserve original registry order.
+    order = {c["model_id"]: i for i, c in enumerate(candidates)}
+    results.sort(key=lambda r: order.get(r["model_id"], 999))
+    for result in results:
+        state = result.get("state", "UNAVAILABLE")
+        if state != "ACTIVE":
+            print(f"[{state:13}] HTTP {result.get('status_code') or 'N/A':>3}  {result['model_id']}  (best key {result.get('key_index', '?')})")
+            if result.get("reason"):
+                print(f"               {result.get('reason', '')}")
     output = {
         "schema_version": 1,
         "checked_at_epoch": int(time.time()),
         "base_url": args.base_url,
         "probe_max_tokens": args.max_tokens,
+        "api_key_count": len(keys),
         "results": results,
         "active_model_ids": [r["model_id"] for r in results if r["state"] == "ACTIVE"],
     }
@@ -191,7 +260,7 @@ def probe(args: argparse.Namespace) -> int:
         )
     atomic_write(Path(args.output), json.dumps(output, indent=2) + "\n", 0o600)
     active = output["active_model_ids"]
-    print(f"\nProbe summary: {len(active)} ACTIVE / {len(results)} checked.")
+    print(f"\nProbe summary: {len(active)} ACTIVE / {len(results)} checked using {len(keys)} key(s).")
     if not active:
         print("No model passed the inference probe; installer must not replace the current configuration.")
         return 2
@@ -248,6 +317,14 @@ def build(args: argparse.Namespace) -> int:
     if not master_key:
         master_key = "sk-" + secrets.token_urlsafe(40)
 
+    # Collect all API keys for multi-key rotation support.
+    api_keys = load_api_keys()
+    api_key_ref = ",".join(
+        "os.environ/NVIDIA_NIM_API_KEY" if i == 0
+        else f"os.environ/NVIDIA_NIM_API_KEY_{i + 1:02d}"
+        for i in range(len(api_keys))
+    )
+
     model_list = []
     aliases = []
 
@@ -264,7 +341,7 @@ def build(args: argparse.Namespace) -> int:
             "litellm_params": {
                 "model": "nvidia_nim/" + item["model_id"],
                 "api_base": args.base_url.rstrip("/"),
-                "api_key": "os.environ/NVIDIA_NIM_API_KEY",
+                "api_key": api_key_ref,
                 "drop_params": True,
                 "timeout": args.provider_timeout,
             },

@@ -64,7 +64,11 @@ class RegistryTests(unittest.TestCase):
             )
 
             with mock.patch.dict(
-                os.environ, {"LITELLM_MASTER_KEY": "test-master-key"}
+                os.environ,
+                {
+                    "LITELLM_MASTER_KEY": "test-master-key",
+                    "NVIDIA_NIM_API_KEY": "key-primary-123",
+                },
             ):
                 self.assertEqual(module.build(args), 0)
 
@@ -98,7 +102,11 @@ class RegistryTests(unittest.TestCase):
             )
 
             with mock.patch.dict(
-                os.environ, {"LITELLM_MASTER_KEY": "test-master-key"}
+                os.environ,
+                {
+                    "LITELLM_MASTER_KEY": "test-master-key",
+                    "NVIDIA_NIM_API_KEY": "key-primary-123",
+                },
             ):
                 module.build(args)
 
@@ -131,7 +139,11 @@ class RegistryTests(unittest.TestCase):
                 provider_timeout=120,
             )
 
-            with self.assertRaises(ValueError):
+            env = {
+                "LITELLM_MASTER_KEY": "test-master-key",
+                "NVIDIA_NIM_API_KEY": "key-primary-123",
+            }
+            with mock.patch.dict(os.environ, env), self.assertRaises(ValueError):
                 module.build(args)
 
     def test_build_rejects_non_dict_probe_results(self):
@@ -149,7 +161,11 @@ class RegistryTests(unittest.TestCase):
                 provider_timeout=120,
             )
 
-            with self.assertRaises(TypeError):
+            env = {
+                "LITELLM_MASTER_KEY": "test-master-key",
+                "NVIDIA_NIM_API_KEY": "key-primary-123",
+            }
+            with mock.patch.dict(os.environ, env), self.assertRaises(TypeError):
                 module.build(args)
 
     def test_build_sorts_active_models_by_latency(self):
@@ -189,9 +205,11 @@ class RegistryTests(unittest.TestCase):
                 sort_by_latency=True,
             )
 
-            with mock.patch.dict(
-                os.environ, {"LITELLM_MASTER_KEY": "test-master-key"}
-            ):
+            env = {
+                "LITELLM_MASTER_KEY": "test-master-key",
+                "NVIDIA_NIM_API_KEY": "key-primary-123",
+            }
+            with mock.patch.dict(os.environ, env):
                 self.assertEqual(module.build(args), 0)
 
             config = json.loads(output.read_text())
@@ -247,9 +265,11 @@ class RegistryTests(unittest.TestCase):
                 sort_by_latency=False,
             )
 
-            with mock.patch.dict(
-                os.environ, {"LITELLM_MASTER_KEY": "test-master-key"}
-            ):
+            env = {
+                "LITELLM_MASTER_KEY": "test-master-key",
+                "NVIDIA_NIM_API_KEY": "key-primary-123",
+            }
+            with mock.patch.dict(os.environ, env):
                 self.assertEqual(module.build(args), 0)
 
             config = json.loads(output.read_text())
@@ -262,6 +282,78 @@ class RegistryTests(unittest.TestCase):
                 models[0]["litellm_params"]["model"],
                 "nvidia_nim/z-ai/glm-5.3-flash",
             )
+
+
+    def test_load_api_keys_single(self):
+        with mock.patch.dict(
+            os.environ, {"NVIDIA_NIM_API_KEY": "key-primary-123"}, clear=True
+        ):
+            keys = module.load_api_keys()
+            self.assertEqual(keys, ["key-primary-123"])
+
+    def test_load_api_keys_multiple(self):
+        env = {
+            "NVIDIA_NIM_API_KEY": "key-primary-123",
+            "NVIDIA_NIM_API_KEY_02": "key-secondary-456",
+            "NVIDIA_NIM_API_KEY_03": "key-tertiary-789",
+        }
+        with mock.patch.dict(os.environ, env, clear=True):
+            keys = module.load_api_keys()
+            self.assertEqual(
+                keys,
+                ["key-primary-123", "key-secondary-456", "key-tertiary-789"],
+            )
+
+    def test_load_api_keys_missing_raises(self):
+        with mock.patch.dict(os.environ, {}, clear=True), self.assertRaises(SystemExit):
+            module.load_api_keys()
+
+    def test_build_includes_multi_api_keys(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            probe = root / "probe.json"
+            output = root / "config.json"
+
+            probe.write_text(json.dumps({
+                "results": [
+                    {
+                        "legacy_id": "nvidia/z-ai/glm-5.3-flash",
+                        "model_id": "z-ai/glm-5.3-flash",
+                        "state": "ACTIVE",
+                        "latency_seconds": 0.8,
+                    },
+                    {
+                        "legacy_id": "nvidia/nvidia/nemotron-3.5-lightning-30b-a3b",
+                        "model_id": "nvidia/nvidia/nemotron-3.5-lightning-30b-a3b",
+                        "state": "ACTIVE",
+                        "latency_seconds": 1.2,
+                    },
+                ]
+            }))
+
+            args = argparse.Namespace(
+                probe_results=str(probe),
+                output=str(output),
+                base_url="https://integrate.api.nvidia.com/v1",
+                provider_timeout=120,
+            )
+
+            env = {
+                "LITELLM_MASTER_KEY": "sk-test-master-key",
+                "NVIDIA_NIM_API_KEY": "key-primary-123",
+                "NVIDIA_NIM_API_KEY_02": "key-secondary-456",
+            }
+            with mock.patch.dict(os.environ, env):
+                self.assertEqual(module.build(args), 0)
+
+            config = json.loads(output.read_text())
+            models = config["model_list"]
+            self.assertEqual(len(models), 2)
+            # All models should reference the multi-key string
+            for model in models:
+                api_key = model["litellm_params"]["api_key"]
+                self.assertIn("os.environ/NVIDIA_NIM_API_KEY", api_key)
+                self.assertIn("os.environ/NVIDIA_NIM_API_KEY_02", api_key)
 
 
 if __name__ == "__main__":

@@ -97,26 +97,61 @@ fi
 LITELLM_BIN="$(command -v litellm)"
 [[ -x "$LITELLM_BIN" ]] || die "LiteLLM executable is not executable."
 
-# Reuse existing key if present, without sourcing an untrusted shell file.
-if [[ -z "${NVIDIA_NIM_API_KEY:-${NVIDIA_API_KEY:-}}" && -f "$ENV_FILE" ]]; then
-  NVIDIA_NIM_API_KEY="$(python3 - "$ENV_FILE" <<'PY'
-import re, sys
+# Collect all NVIDIA_NIM_API_KEY_N environment variables for multi-key rotation.
+# NVIDIA_NIM_API_KEY is the primary key; NVIDIA_NIM_API_KEY_02, _03, ... are
+# additional keys used for failover and load balancing.
+declare -a NVIDIA_NIM_API_KEYS=()
+
+# Reuse existing keys if present, without sourcing an untrusted shell file.
+if [[ -z "${NVIDIA_NIM_API_KEY:-}" && -f "$ENV_FILE" ]]; then
+  while IFS='=' read -r key_name key_value; do
+    if [[ "$key_name" =~ ^NVIDIA_NIM_API_KEY(_[0-9]+)?$ ]]; then
+      NVIDIA_NIM_API_KEYS+=("$key_value")
+    fi
+  done < <(python3 - "$ENV_FILE" <<'PY'
+import sys
 from pathlib import Path
 for line in Path(sys.argv[1]).read_text().splitlines():
-    match = re.fullmatch(r"NVIDIA_NIM_API_KEY=([A-Za-z0-9_-]+)", line)
-    if match:
-        print(match.group(1))
-        break
+    if "=" in line:
+        name, _, value = line.partition("=")
+        print(f"{name}={value}")
 PY
-)"
+  )
 fi
-NVIDIA_NIM_API_KEY="${NVIDIA_NIM_API_KEY:-${NVIDIA_API_KEY:-}}"
-if [[ -z "$NVIDIA_NIM_API_KEY" ]]; then
-  read -r -s -p "NVIDIA NIM API Key: " NVIDIA_NIM_API_KEY
+
+# Collect from environment variables.
+if [[ -z "${NVIDIA_NIM_API_KEYS[*]:-}" ]]; then
+  NVIDIA_NIM_API_KEYS+=("${NVIDIA_NIM_API_KEY:-${NVIDIA_API_KEY:-}}")
+  index=2
+  while true; do
+    env_var_name="NVIDIA_NIM_API_KEY_$(printf '%02d' $index)"
+    key_value="${!env_var_name:-}"
+    if [[ -z "$key_value" ]]; then
+      break
+    fi
+    NVIDIA_NIM_API_KEYS+=("$key_value")
+    ((index++)) || true
+  done
+fi
+
+# Prompt for primary key if none available.
+if [[ -z "${NVIDIA_NIM_API_KEYS[0]:-}" ]]; then
+  read -r -s -p "NVIDIA NIM API Key (primary): " "NVIDIA_NIM_API_KEYS[0]"
   printf '\n'
 fi
-[[ "$NVIDIA_NIM_API_KEY" =~ ^[A-Za-z0-9_-]+$ ]] || die "NVIDIA API key is empty or contains unsupported characters."
-export NVIDIA_NIM_API_KEY
+
+# Validate all keys.
+for key in "${NVIDIA_NIM_API_KEYS[@]}"; do
+  [[ "$key" =~ ^[A-Za-z0-9_-]+$ ]] || die "NVIDIA API key is empty or contains unsupported characters."
+done
+
+# Export individual variables for subprocesses (Python scripts read them).
+export NVIDIA_NIM_API_KEY="${NVIDIA_NIM_API_KEYS[0]}"
+index=2
+while (( index <= ${#NVIDIA_NIM_API_KEYS[@]} )); do
+  export "NVIDIA_NIM_API_KEY_$(printf '%02d' $index)"="${NVIDIA_NIM_API_KEYS[$((index - 1))]}"
+  ((index++)) || true
+done
 
 if [[ -z "$PROBE_MODE" ]]; then
   printf '\nThe installer will test up to 14 model candidates with real inference requests.\n'
@@ -217,8 +252,16 @@ python3 "$ROOT_DIR/scripts/nim_registry.py" build \
   $SORT_FLAG
 install -m 600 "$TMP_DIR/litellm_config.yaml" "$CONFIG_FILE"
 
-printf 'NVIDIA_NIM_API_KEY=%s\nLITELLM_MASTER_KEY=%s\n' \
-  "$NVIDIA_NIM_API_KEY" "$MASTER_KEY" > "$TMP_DIR/environment"
+# Write all API keys to the environment file for multi-key rotation.
+{
+  printf 'NVIDIA_NIM_API_KEY=%s\n' "${NVIDIA_NIM_API_KEYS[0]}"
+  index=2
+  while (( index <= ${#NVIDIA_NIM_API_KEYS[@]} )); do
+    printf 'NVIDIA_NIM_API_KEY_%s=%s\n' "$(printf '%02d' $index)" "${NVIDIA_NIM_API_KEYS[$((index - 1))]}"
+    ((index++)) || true
+  done
+  printf 'LITELLM_MASTER_KEY=%s\n' "$MASTER_KEY"
+} > "$TMP_DIR/environment"
 chmod 600 "$TMP_DIR/environment"
 install -m 600 "$TMP_DIR/environment" "$ENV_FILE"
 

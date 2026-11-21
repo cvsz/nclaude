@@ -182,7 +182,15 @@ instead of embedding legacy buggy copies. Eliminates the latent regression risk
 (F6). Runs the same static validation suite before packaging. Removes unused
 imports (`textwrap`, `os`, `sys`). | P3 |
 | `nclaude-installer/install.sh` | Added `NCLAUDE_SORT_BY_LATENCY` environment control; passes
-`--sort-by-latency` to `build()` when enabled. | P3 |
+`--sort-by-latency` to `build()` when enabled. Added multi-API key support:
+collects `NVIDIA_NIM_API_KEY` (primary) plus `NVIDIA_NIM_API_KEY_02`, `_03`, …
+from environment variables or existing env file, writes all keys to the
+EnvironmentFile, and passes them to LiteLLM for key rotation/failover. | P3 |
+| `nclaude-installer/scripts/nim_registry.py` | `probe()` now loads all API keys
+via `load_api_keys()` and rotates through them during candidate probing, trying
+each key until an ACTIVE model is found. `build()` includes all API keys in the
+generated LiteLLM config as a comma-separated `os.environ/...` reference list
+for LiteLLM-side key rotation. | P3 |
 | `~/.claude/settings.json` | Claude Code settings: mapped all models to `nclaude` alias; added `ANTHROPIC_ORIGINAL_MODEL=original-model` for backward compatibility. | P3 |
 | `~/.claude/litellm_config.yaml` | Rebuilt from live probe results: 7 ACTIVE models ordered by latency (fastest = `nclaude` primary) plus `original-model` alias for backward compatibility, NVIDIA NIM API base, `os.environ/` secret references, `nvidia_nim/` provider prefix, router fallbacks configured. | P3 |
 
@@ -201,9 +209,11 @@ No verified vulnerabilities were introduced or present in the maintained code
 path. Security-relevant controls confirmed:
 
 - Proxy bound to `127.0.0.1` only (installer enforces `HOST == 127.0.0.1`).
-- NVIDIA API key and LiteLLM master key stored in a mode-0600 systemd
+- NVIDIA API key(s) and LiteLLM master key stored in a mode-0600 systemd
   EnvironmentFile; not embedded in LiteLLM config (`os.environ/...` references);
   not passed on the command line; read via `read -s` (not in shell history/argv).
+  Multi-key rotation supported via `NVIDIA_NIM_API_KEY` (primary) plus
+  `NVIDIA_NIM_API_KEY_02`, `_03`, … for rate-limit and auth-error failover.
 - systemd hardening: `NoNewPrivileges=true`, `PrivateTmp=true`,
   `ProtectSystem=strict`, `ProtectHome=read-only`, scoped `ReadWritePaths`.
 - Config/data/systemd directories created mode 700; `umask 077`.
