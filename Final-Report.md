@@ -191,8 +191,19 @@ via `load_api_keys()` and rotates through them during candidate probing, trying
 each key until an ACTIVE model is found. `build()` includes all API keys in the
 generated LiteLLM config as a comma-separated `os.environ/...` reference list
 for LiteLLM-side key rotation. | P3 |
-| `~/.claude/settings.json` | Claude Code settings: mapped all models to `nclaude` alias; added `ANTHROPIC_ORIGINAL_MODEL=original-model` for backward compatibility. | P3 |
-| `~/.claude/litellm_config.yaml` | Rebuilt from live probe results: 7 ACTIVE models ordered by latency (fastest = `nclaude` primary) plus `original-model` alias for backward compatibility, NVIDIA NIM API base, `os.environ/` secret references, `nvidia_nim/` provider prefix, router fallbacks configured. | P3 |
+| `~/.claude/settings.json` | Claude Code settings: mapped Opus/Sonnet/Haiku to distinct
+`nclaude-opus`/`nclaude-sonnet`/`nclaude-haiku` aliases (resolves duplicate
+`nclaude` entries in Claude Code model menu); added `ANTHROPIC_ORIGINAL_MODEL=original-model` for backward compatibility. Deployed to local machine and `zwslcore`. | P3 |
+| `~/.claude/litellm_config.yaml` | Rebuilt from live probe results: `nclaude` primary +
+`nclaude-opus`/`nclaude-sonnet`/`nclaude-haiku` tier aliases + fallback chain +
+`original-model` for backward compatibility, NVIDIA NIM API base,
+`os.environ/NVIDIA_NIM_API_KEY,os.environ/NVIDIA_NIM_API_KEY_02` multi-key
+secret references, `nvidia_nim/` provider prefix, router fallbacks configured.
+All 5 model aliases verified with HTTP 200 smoke tests. Deployed to local
+machine and `zwslcore`. | P3 |
+| `~/.config/nclaude/environment` | Updated to store both NVIDIA API keys
+(`NVIDIA_NIM_API_KEY`, `NVIDIA_NIM_API_KEY_02`) plus `LITELLM_MASTER_KEY`,
+mode 0600. | P3 |
 
 No public interface changed: `./install.sh`, `./install`, `./uninstall.sh`,
 `make -C nclaude-installer {lint,test,install,uninstall,status,logs,clean}`, and
