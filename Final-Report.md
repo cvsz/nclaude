@@ -289,17 +289,17 @@ export NVIDIA_NIM_API_KEY='<redacted>' && python3 nclaude-installer/scripts/nim_
   --interval 1
 ```
 
-Result: **14 candidates probed — 7 ACTIVE / 4 EOL / 2 INCONCLUSIVE / 1 NETWORK_ERROR**
+Result: **14 candidates probed — 6 ACTIVE / 4 EOL / 2 INCONCLUSIVE / 2 NETWORK_ERROR** (zwslcore, latest verified run)
 
 | Rank | Model ID | Status | HTTP | Reason |
 |---|---|---|---|---|
 | 1 | `poolside/laguna-xs-2.1` | ACTIVE | 200 | Chat completion returned non-empty assistant content |
 | 2 | `nvidia/nemotron-3.5-super-vl-120b-a12b` | ACTIVE | 200 | Chat completion returned non-empty assistant content |
-| 3 | `nvidia/nemotron-3-nano-omni-30b-a3b-reasoning` | ACTIVE | 200 | Chat completion returned non-empty assistant content |
-| 4 | `minimaxai/minimax-m3.1-flash` | ACTIVE | 200 | Chat completion returned non-empty assistant content |
-| 5 | `nvidia/nemotron-3-ultra-550b-a55b` | ACTIVE | 200 | Chat completion returned non-empty assistant content |
+| 3 | `nvidia/nemotron-3-ultra-550b-a55b` | ACTIVE | 200 | Chat completion returned non-empty assistant content |
+| 4 | `nvidia/nemotron-3-nano-omni-30b-a3b-reasoning` | ACTIVE | 200 | Chat completion returned non-empty assistant content |
+| 5 | `minimaxai/minimax-m3.1-flash` | ACTIVE | 200 | Chat completion returned non-empty assistant content |
 | 6 | `meta/muse-glimmer-30b` | ACTIVE | 200 | Chat completion returned non-empty assistant content |
-| 7 | `stepfun-ai/step-5-preview` | ACTIVE | 200 | Chat completion returned non-empty assistant content |
+| 7 | `stepfun-ai/step-5-preview` | NETWORK_ERROR | N/A | Read operation timed out |
 | 8 | `nvidia/nvidia/nemotron-3.5-lightning-30b-a3b` | INCONCLUSIVE | 200 | No assistant text returned |
 | 9 | `deepseek-ai/deepseek-v4.1-flash` | EOL | 410 | End of life on 2026-11-16 |
 | 10 | `openai/gpt-oss-20b` | EOL | 410 | End of life on 2026-11-18 |
@@ -343,8 +343,8 @@ End-to-end probe/smoke via the full installer (`make install`) was not executed:
 - `nclaude.py` — rewritten to read maintained files instead of embedding legacy copies
 - `.gitignore` (root) — expanded to cover probe results, generated configs, backups, Claude settings, temp/cache files, OS files
 - `nclaude-installer/.gitignore` — expanded to cover probe results, generated configs, backups, temp/cache files, OS files
-- `~/.claude/settings.json` — Claude Code settings: mapped all models to `nclaude` alias; added `ANTHROPIC_ORIGINAL_MODEL=original-model` for backward compatibility. Deployed to local machine and `zwslcore`.
-- `~/.claude/litellm_config.yaml` — Rebuilt from live probe results: 6-8 ACTIVE models ordered by latency (fastest = `nclaude` primary) plus `original-model` alias for backward compatibility, NVIDIA NIM API base, `os.environ/` secret references, `nvidia_nim/` provider prefix, router fallbacks configured. Deployed to local machine and `zwslcore`.
+- `~/.claude/settings.json` — Claude Code settings: mapped Opus/Sonnet/Haiku to distinct `nclaude-opus`/`nclaude-sonnet`/`nclaude-haiku` aliases (resolves duplicate `nclaude` entries in Claude Code model menu); added `ANTHROPIC_ORIGINAL_MODEL=original-model` for backward compatibility. Deployed to local machine and `zwslcore`.
+- `~/.claude/litellm_config.yaml` — Rebuilt from live probe results: `nclaude` primary + `nclaude-opus`/`nclaude-sonnet`/`nclaude-haiku` tier aliases + fallback chain + `original-model` for backward compatibility, NVIDIA NIM API base, `os.environ/` secret references, `nvidia_nim/` provider prefix, router fallbacks configured. All 5 model aliases verified with HTTP 200 smoke tests. Deployed to local machine and `zwslcore`.
 - `Final-Report.md` — this report (new)
 
 No user data, secrets, or unrelated files were modified or deleted.
