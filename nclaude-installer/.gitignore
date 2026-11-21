@@ -1,0 +1,33 @@
+# Python bytecode and cache
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Environment and secrets
+.env
+.env.*
+
+# Secrets and keys
+*.key
+*.pem
+*.log
+
+# Generated release artifacts
+*.zip
+
+# Probe results and generated configuration (runtime-generated, not source)
+probe-results.json
+*-results.json
+litellm_config.yaml
+model-registry.json
+latest-backup
+backups/
+
+# Temporary and cache files
+.tmp/
+*.tmp
+*.bak
+
+# OS-generated files
+.DS_Store
+Thumbs.db

@@ -1,0 +1,63 @@
+{
+  "schema_version": 1,
+  "provider": "NVIDIA NIM",
+  "normalization": "Remove exactly one leading legacy 'nvidia/' prefix before passing the ID to NVIDIA's API.",
+  "models": [
+    {
+      "rank": 1,
+      "legacy_id": "nvidia/nvidia/nemotron-3.5-super-vl-120b-a12b"
+    },
+    {
+      "rank": 2,
+      "legacy_id": "nvidia/nvidia/nemotron-3.5-lightning-30b-a3b"
+    },
+    {
+      "rank": 3,
+      "legacy_id": "nvidia/nvidia/nemotron-3-ultra-550b-a55b"
+    },
+    {
+      "rank": 4,
+      "legacy_id": "nvidia/z-ai/glm-5.3-flash"
+    },
+    {
+      "rank": 5,
+      "legacy_id": "nvidia/deepseek-ai/deepseek-v4.1-flash"
+    },
+    {
+      "rank": 6,
+      "legacy_id": "nvidia/poolside/laguna-xs-2.1"
+    },
+    {
+      "rank": 7,
+      "legacy_id": "nvidia/minimaxai/minimax-m3.1-flash"
+    },
+    {
+      "rank": 8,
+      "legacy_id": "nvidia/stepfun-ai/step-5-preview"
+    },
+    {
+      "rank": 9,
+      "legacy_id": "nvidia/nvidia/nemotron-3-nano-omni-30b-a3b-reasoning"
+    },
+    {
+      "rank": 10,
+      "legacy_id": "nvidia/google/gemma-4-31b-it"
+    },
+    {
+      "rank": 11,
+      "legacy_id": "nvidia/openai/gpt-oss-20b"
+    },
+    {
+      "rank": 12,
+      "legacy_id": "nvidia/meta/muse-glimmer-30b"
+    },
+    {
+      "rank": 13,
+      "legacy_id": "nvidia/meta/llama-3.2-90b-vision-instruct"
+    },
+    {
+      "rank": 14,
+      "legacy_id": "nvidia/meta/llama-3.2-11b-vision-instruct"
+    }
+  ]
+}

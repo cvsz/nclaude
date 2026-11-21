@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+# Thin delegate to the maintained nclaude-installer package.
+#
+# The nclaude-installer installer probes NVIDIA NIM candidates before
+# changing any files, rolls back on health or inference failure, and
+# preserves an existing LiteLLM master key. Delegating here keeps the
+# documented ./install entry point consistent with `make install`
+# and removes the previous non-probing installer that left the system
+# in a broken state when the post-install smoke test failed.
+ROOT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
+exec "$ROOT_DIR/nclaude-installer/install.sh" "$@"

@@ -1,0 +1,31 @@
+# Secrets and generated runtime state
+environment
+*.env
+*.key
+*.pem
+*.log
+__pycache__/
+.pytest_cache/
+.venv/
+dist/
+build/
+
+# Probe results and generated LiteLLM configuration (runtime-generated, not source)
+probe-results.json
+*-results.json
+litellm_config.yaml
+model-registry.json
+latest-backup
+backups/
+
+# Claude Code settings managed by installer (user-specific, not source)
+.claude/settings.json
+
+# Temporary and cache files
+.tmp/
+*.tmp
+*.bak
+
+# OS-generated files
+.DS_Store
+Thumbs.db
